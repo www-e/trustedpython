@@ -9,9 +9,12 @@
    DATABASE_URL=your_neon_postgres_connection
    SECRET_KEY=your-secret-key
    DEBUG=True
+   ALLOWED_ORIGINS=*
    ```
 4. Build command: `pip install -r requirements.txt`
 5. Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+**Note**: The application automatically converts standard PostgreSQL URLs to asyncpg format, so Neon connection strings work directly.
 
 ## Production (Coolify)
 
