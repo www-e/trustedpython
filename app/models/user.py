@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Column
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, String
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -114,11 +114,11 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(sa_column=Column(unique=True, nullable=False))
-    hashed_password: str = Field(nullable=False)
-    phone_number: str = Field(nullable=False)
-    second_phone_number: Optional[str] = Field(default=None)
-    account_info: str = Field(nullable=False)
+    username: str = Field(sa_column=Column(String, unique=True, nullable=False))
+    hashed_password: str = Field(sa_column=Column(String, nullable=False))
+    phone_number: str = Field(sa_column=Column(String, nullable=False))
+    second_phone_number: Optional[str] = Field(sa_column=Column(String, nullable=True))
+    account_info: str = Field(sa_column=Column(String, nullable=False))
     role: UserRole = Field(sa_column=Column(SQLEnum(UserRole), nullable=False), default=UserRole.REGULAR_USER)
     state: UserState = Field(sa_column=Column(SQLEnum(UserState), nullable=False), default=UserState.PENDING)
     created_at: datetime = Field(default_factory=datetime.utcnow)

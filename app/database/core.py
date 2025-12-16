@@ -16,14 +16,16 @@ if DATABASE_URL.startswith("postgresql://") and "asyncpg" not in DATABASE_URL:
     # Replace the protocol to use asyncpg
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# Handle asyncpg-specific URL parameters (remove incompatible ones like channel_binding)
+# Handle asyncpg-incompatible URL parameters (like channel_binding from Neon)
 parsed = urlparse(DATABASE_URL)
 query_params = parse_qs(parsed.query)
 
-# Remove parameters that asyncpg doesn't support
-unsupported_params = ['channel_binding']
+# Remove parameters that asyncpg SQLAlchemy dialect doesn't support properly
+# Based on the error, both 'channel_binding' and 'sslmode' cause issues
+unsupported_params = ['channel_binding', 'sslmode']
 for param in unsupported_params:
-    query_params.pop(param, None)
+    if param in query_params:
+        del query_params[param]
 
 # Reconstruct the URL without unsupported parameters
 new_query = urlencode(query_params, doseq=True)
@@ -36,8 +38,12 @@ DATABASE_URL = urlunparse((
     parsed.fragment
 ))
 
-# Create async engine
-engine = create_async_engine(DATABASE_URL)
+# Create async engine with proper SSL configuration for cloud providers like Neon
+engine = create_async_engine(
+    DATABASE_URL,
+    # Add any additional engine configuration if needed
+    # echo=True  # Uncomment for SQL debugging
+)
 
 async def create_db_and_tables():
     """Initialize database tables"""
