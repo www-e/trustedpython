@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 from app.models.user import SQLModel
 import os
 from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 load_dotenv()
 
@@ -14,6 +15,26 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://username:password
 if DATABASE_URL.startswith("postgresql://") and "asyncpg" not in DATABASE_URL:
     # Replace the protocol to use asyncpg
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+# Handle asyncpg-specific URL parameters (remove incompatible ones like channel_binding)
+parsed = urlparse(DATABASE_URL)
+query_params = parse_qs(parsed.query)
+
+# Remove parameters that asyncpg doesn't support
+unsupported_params = ['channel_binding']
+for param in unsupported_params:
+    query_params.pop(param, None)
+
+# Reconstruct the URL without unsupported parameters
+new_query = urlencode(query_params, doseq=True)
+DATABASE_URL = urlunparse((
+    parsed.scheme,
+    parsed.netloc,
+    parsed.path,
+    parsed.params,
+    new_query,
+    parsed.fragment
+))
 
 # Create async engine
 engine = create_async_engine(DATABASE_URL)
