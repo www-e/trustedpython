@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:\\\\python\\\\trusted\" && alembic revision --autogenerate -m \"Initial migration - users table\")",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && alembic upgrade head)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest -v)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_auth.py -v)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_auth.py -v --tb=short)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_auth.py::test_register_user -v)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_auth.py -v --tb=line)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && python -c \"from app.models.user import User; import inspect; print\\([f.name for f in User.__table__.columns]\\)\")",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/ -v --tb=no)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && alembic revision --autogenerate -m \"Add categories, listings, and listing_images tables\")"
+    ]
+  }
+}
