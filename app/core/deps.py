@@ -1,6 +1,6 @@
 """Dependency injection for FastAPI routes."""
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import verify_token
 from app.db import get_db
 from app.models.user import User
+from app.models.enums import UserRole
 from app.repositories.user import UserRepository
 
 
@@ -101,3 +102,25 @@ async def get_current_active_user(
             detail="Inactive user"
         )
     return current_user
+
+
+def require_roles(roles: List[UserRole]):
+    """
+    Dependency factory that requires user to have one of the specified roles.
+
+    Args:
+        roles: List of allowed roles
+
+    Returns:
+        Dependency function
+    """
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        """Check if user has required role."""
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access forbidden. Required role: {', '.join([r.value for r in roles])}"
+            )
+        return current_user
+
+    return role_checker

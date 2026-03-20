@@ -214,3 +214,102 @@ class UserService:
         )
 
         return user
+
+    async def get_profile(self, user_id: int) -> User:
+        """Get user profile."""
+        user = await self.user_repo.get(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+        return user
+
+    async def update_profile(
+        self,
+        user_id: int,
+        username: str | None = None,
+        avatar_url: str | None = None,
+        bio: str | None = None
+    ) -> User:
+        """
+        Update user profile fields.
+
+        Args:
+            user_id: User ID
+            username: New username
+            avatar_url: New avatar URL
+            bio: New bio
+
+        Returns:
+            Updated user
+        """
+        user = await self.user_repo.get(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+
+        # Check if username is taken
+        if username and username != user.username:
+            existing = await self.user_repo.get_by_username(username)
+            if existing and existing.id != user_id:
+                raise ConflictError("Username already taken")
+
+        # Update profile
+        user = await self.user_repo.update_profile(
+            user_id,
+            username=username,
+            avatar_url=avatar_url,
+            bio=bio
+        )
+
+        return user
+
+    async def update_password_v2(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str
+    ) -> None:
+        """
+        Change user password (new method).
+
+        Args:
+            user_id: User ID
+            current_password: Current password
+            new_password: New password
+        """
+        user = await self.user_repo.get(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+
+        # Verify current password
+        if not verify_password(current_password, user.password_hash):
+            raise AuthenticationError("Current password is incorrect")
+
+        # Update password
+        from app.core.security import create_password_hash
+        password_hash = create_password_hash(new_password)
+        await self.user_repo.update_password(user_id, password_hash)
+
+    async def get_user_stats(self, user_id: int) -> dict:
+        """Get user statistics."""
+        user = await self.user_repo.get(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+
+        return {
+            "total_deals_as_buyer": user.total_deals_as_buyer,
+            "total_deals_as_seller": user.total_deals_as_seller,
+            "completed_deals": user.completed_deals,
+            "rating": float(user.rating),
+        }
+
+    async def get_mediators(
+        self,
+        min_rating: float = 0.0,
+        limit: int = 100,
+        offset: int = 0
+    ) -> list[User]:
+        """Get list of available mediators."""
+        return await self.user_repo.get_mediators(
+            min_rating=min_rating,
+            skip=offset,
+            limit=limit
+        )

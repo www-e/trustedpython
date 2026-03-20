@@ -16,6 +16,7 @@ class ListingStatus(str, Enum):
     """Listing status enumeration."""
 
     DRAFT = "draft"
+    PENDING = "pending"  # Awaiting admin approval
     ACTIVE = "active"
     SOLD = "sold"
     PAUSED = "paused"
@@ -31,3 +32,16 @@ class GameType(str, Enum):
     FORTNITE = "fortnite"
     MOBILE_LEGENDS = "mobile_legends"
     OTHER = "other"
+
+
+class DealStatus(str, Enum):
+    """Deal status enumeration."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    AWAITING_PAYMENT = "awaiting_payment"
+    PAYMENT_VERIFIED = "payment_verified"
+    CREDENTIALS_EXCHANGED = "credentials_exchanged"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    DISPUTED = "disputed"

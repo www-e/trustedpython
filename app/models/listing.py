@@ -8,6 +8,11 @@ from app.models.base import BaseModel
 from app.models.user import User
 from app.models.enums import ListingStatus, GameType
 
+# Import for type hints (avoiding circular imports)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.listing_mediator import ListingMediator
+
 
 class Category(BaseModel):
     """Category model for game types."""
@@ -120,6 +125,11 @@ class Listing(BaseModel):
         cascade="all, delete-orphan",
         order_by="ListingImage.sort_order",
         lazy="selectin"
+    )
+    allowed_mediators: Mapped[list["ListingMediator"]] = relationship(
+        "ListingMediator",
+        back_populates="listing",
+        cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
