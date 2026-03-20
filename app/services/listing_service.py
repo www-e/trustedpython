@@ -99,7 +99,9 @@ class ListingService:
             raise NotFoundError(f"Listing {listing_id} not found")
 
         if increment_views:
-            await self.listing_repo.increment_views(listing_id)
+            # Increment views directly on the object to avoid additional queries
+            listing.views_count += 1
+            await self.db.flush()
 
         return listing
 

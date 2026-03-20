@@ -118,7 +118,8 @@ class Listing(BaseModel):
         "ListingImage",
         back_populates="listing",
         cascade="all, delete-orphan",
-        order_by="ListingImage.sort_order"
+        order_by="ListingImage.sort_order",
+        lazy="selectin"
     )
 
     def __repr__(self) -> str:

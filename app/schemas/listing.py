@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 from typing import Optional, List
+from datetime import datetime
 
 from app.models.enums import ListingStatus, GameType
 
@@ -82,8 +83,8 @@ class ListingResponse(ListingBase):
     seller_id: int
     status: ListingStatus
     views_count: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
     images: List[ListingImageResponse] = []
 
 

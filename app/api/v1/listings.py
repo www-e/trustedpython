@@ -5,7 +5,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.router import api_router
 from app.core.deps import get_db, get_current_active_user
 from app.services.listing_service import ListingService
 from app.schemas.listing import (
@@ -179,11 +178,43 @@ async def get_listing(
     Get a listing by ID.
 
     Returns listing details including all images.
-    Increments view count.
     """
     service = ListingService(db)
-    listing = await service.get_listing(listing_id)
-    return ListingResponse.model_validate(listing)
+    listing = await service.get_listing(listing_id, increment_views=False)
+
+    # Convert to dict to avoid async attribute access issues
+    listing_dict = {
+        "id": listing.id,
+        "seller_id": listing.seller_id,
+        "category_id": listing.category_id,
+        "title": listing.title,
+        "description": listing.description,
+        "game_type": listing.game_type,
+        "level": listing.level,
+        "rank": listing.rank,
+        "server": listing.server,
+        "skins_count": listing.skins_count,
+        "characters_count": listing.characters_count,
+        "price": float(listing.price) if listing.price else 0,
+        "status": listing.status,
+        "is_featured": listing.is_featured,
+        "views_count": listing.views_count,
+        "created_at": listing.created_at,
+        "updated_at": listing.updated_at,
+        "images": [
+            {
+                "id": img.id,
+                "listing_id": img.listing_id,
+                "image_url": img.image_url,
+                "caption": img.caption,
+                "sort_order": img.sort_order,
+                "is_primary": img.is_primary
+            }
+            for img in listing.images
+        ]
+    }
+
+    return ListingResponse(**listing_dict)
 
 
 @router.patch(
@@ -319,7 +350,3 @@ async def add_listing_image(
     service = ListingService(db)
     image = await service.add_listing_image(listing_id, current_user.id, image_data)
     return ListingImageResponse.model_validate(image)
-
-
-# Include router in API v1
-api_router.include_router(router, tags=["Listings"])

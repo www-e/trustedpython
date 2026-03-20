@@ -21,6 +21,46 @@ class ListingRepository(BaseRepository[Listing]):
         """
         super().__init__(Listing, db)
 
+    async def get(self, id: int) -> Listing | None:
+        """
+        Get a single record by ID with images.
+
+        Args:
+            id: Record ID
+
+        Returns:
+            Listing instance with images if found, None otherwise
+        """
+        result = await self.db.execute(
+            select(Listing)
+            .options(selectinload(Listing.images))
+            .where(Listing.id == id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Listing]:
+        """
+        Get all records with pagination and images.
+
+        Args:
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of listing instances with images
+        """
+        result = await self.db.execute(
+            select(Listing)
+            .options(selectinload(Listing.images))
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_with_images(self, listing_id: int) -> Listing | None:
         """
         Get a listing by ID with images preloaded.
@@ -57,6 +97,7 @@ class ListingRepository(BaseRepository[Listing]):
         """
         result = await self.db.execute(
             select(Listing)
+            .options(selectinload(Listing.images))
             .where(Listing.seller_id == seller_id)
             .order_by(desc(Listing.created_at))
             .offset(skip)
@@ -83,6 +124,7 @@ class ListingRepository(BaseRepository[Listing]):
         """
         result = await self.db.execute(
             select(Listing)
+            .options(selectinload(Listing.images))
             .where(Listing.category_id == category_id)
             .order_by(desc(Listing.created_at))
             .offset(skip)
@@ -107,6 +149,7 @@ class ListingRepository(BaseRepository[Listing]):
         """
         result = await self.db.execute(
             select(Listing)
+            .options(selectinload(Listing.images))
             .where(Listing.status == ListingStatus.ACTIVE)
             .order_by(desc(Listing.is_featured), desc(Listing.created_at))
             .offset(skip)
@@ -166,6 +209,7 @@ class ListingRepository(BaseRepository[Listing]):
 
         result = await self.db.execute(
             select(Listing)
+            .options(selectinload(Listing.images))
             .where(and_(*conditions))
             .order_by(desc(Listing.is_featured), desc(Listing.created_at))
             .offset(skip)
@@ -188,6 +232,7 @@ class ListingRepository(BaseRepository[Listing]):
         """
         result = await self.db.execute(
             select(Listing)
+            .options(selectinload(Listing.images))
             .where(
                 and_(
                     Listing.status == ListingStatus.ACTIVE,
@@ -209,7 +254,9 @@ class ListingRepository(BaseRepository[Listing]):
         Returns:
             True if updated, False if not found
         """
-        listing = await self.get(listing_id)
+        # Use base repository's get method to avoid eager loading images
+        from app.repositories.base import BaseRepository
+        listing = await BaseRepository.get(self, listing_id)
         if listing:
             listing.views_count += 1
             await self.db.flush()

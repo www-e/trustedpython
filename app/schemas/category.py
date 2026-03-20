@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 
 class CategoryBase(BaseModel):
@@ -36,5 +37,5 @@ class CategoryResponse(CategoryBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime

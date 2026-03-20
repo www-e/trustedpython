@@ -5,7 +5,6 @@ from typing import List
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.router import api_router
 from app.core.deps import get_db, get_current_active_user
 from app.services.category_service import CategoryService
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
@@ -163,7 +162,3 @@ async def delete_category(
     service = CategoryService(db)
     await service.delete_category(category_id)
     return None
-
-
-# Include router in API v1
-api_router.include_router(router, tags=["Categories"])

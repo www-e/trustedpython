@@ -10,7 +10,19 @@
       "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_auth.py -v --tb=line)",
       "Bash(cd \"D:\\\\python\\\\trusted\" && python -c \"from app.models.user import User; import inspect; print\\([f.name for f in User.__table__.columns]\\)\")",
       "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/ -v --tb=no)",
-      "Bash(cd \"D:\\\\python\\\\trusted\" && alembic revision --autogenerate -m \"Add categories, listings, and listing_images tables\")"
+      "Bash(cd \"D:\\\\python\\\\trusted\" && alembic revision --autogenerate -m \"Add categories, listings, and listing_images tables\")",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_categories.py -v --tb=short)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_categories.py -v --tb=short -k \"test_get_categories\")",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_categories.py::test_get_categories -v)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_categories.py -v --tb=no)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py -v --tb=line)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py -v --tb=short)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py -v --tb=no)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py::test_get_listing_by_id -v)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py::test_get_listing_by_id -v --tb=no)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/ -v --tb=no -x)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/test_listings.py::test_get_listing_by_id -v --tb=short)",
+      "Bash(cd \"D:\\\\python\\\\trusted\" && pytest tests/ --tb=no -q)"
     ]
   }
 }
