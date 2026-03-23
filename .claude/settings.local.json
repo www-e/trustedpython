@@ -1,13 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "*",
-      "Bash(python -m alembic history)",
-      "Bash(python -m alembic stamp base)",
-      "Bash(python -m alembic stamp --purge)",
-      "Bash(python -m alembic upgrade head)",
-      "Bash(python setup_db.py)",
-      "Bash(python -m pytest tests/ -v --tb=short)"
+      "Bash(rtk *)",
+      "Bash(pytest *)",
+      "Bash(alembic *)",
+      "Bash(pip install *)"
     ]
   }
 }

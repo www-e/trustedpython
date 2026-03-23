@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Generator
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.db import get_db
@@ -13,7 +14,7 @@ from app.main import app
 from app.models.base import Base
 
 
-# Test database URL (using same database but with test isolation)
+# Test database URL
 TEST_DATABASE_URL = settings.database_url
 
 
@@ -21,7 +22,10 @@ TEST_DATABASE_URL = settings.database_url
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
     echo=False,
-    future=True
+    future=True,
+    pool_pre_ping=True,
+    pool_size=1,
+    max_overflow=0,
 )
 
 # Create async session factory for tests
@@ -45,26 +49,55 @@ def event_loop() -> Generator:
     loop.close()
 
 
-@pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+@pytest.fixture(scope="session")
+async def setup_database():
     """
-    Create a database session for tests.
+    Set up database schema once for all tests.
+    """
+    async with test_engine.begin() as conn:
+        # Create ENUM types (ignore if already exists)
+        try:
+            await conn.execute(text("CREATE TYPE game_type AS ENUM ('PUBG', 'FREE_FIRE', 'CALL_OF_DUTY', 'FORTNITE', 'MOBILE_LEGENDS', 'OTHER')"))
+        except Exception:
+            pass  # Type already exists
+        try:
+            await conn.execute(text("CREATE TYPE listing_status AS ENUM ('draft', 'pending', 'active', 'sold', 'paused', 'archived')"))
+        except Exception:
+            pass  # Type already exists
+        try:
+            await conn.execute(text("CREATE TYPE deal_status AS ENUM ('pending', 'in_progress', 'awaiting_payment', 'payment_verified', 'credentials_exchanged', 'completed', 'cancelled', 'disputed')"))
+        except Exception:
+            pass  # Type already exists
+        # Create all tables
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Cleanup after all tests
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text("DROP TYPE IF EXISTS deal_status CASCADE"))
+        await conn.execute(text("DROP TYPE IF EXISTS game_type CASCADE"))
+        await conn.execute(text("DROP TYPE IF EXISTS listing_status CASCADE"))
+
+
+@pytest.fixture(scope="function")
+async def db_session(setup_database) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Create a database session for tests with transaction isolation.
+
+    Args:
+        setup_database: Session-scoped fixture that sets up the schema
 
     Yields:
         Async database session
     """
-    async with test_engine.begin() as conn:
-        # Create all tables
-        await conn.run_sync(Base.metadata.create_all)
-
     async with TestAsyncSessionLocal() as session:
-        yield session
-        # Rollback after test
-        await session.rollback()
-
-    # Drop all tables after test
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # Start transaction
+        trans = await session.begin()
+        try:
+            yield session
+        finally:
+            # Always rollback to ensure clean state for next test
+            await trans.rollback()
 
 
 @pytest.fixture(scope="function")
@@ -78,7 +111,6 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     Yields:
         Async HTTP client
     """
-
     async def override_get_db():
         """Override get_db dependency."""
         yield db_session

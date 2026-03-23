@@ -1,8 +1,8 @@
-"""Add categories, listings, and listing_images tables
+"""Initial migration - all models with proper ENUM handling
 
-Revision ID: fe4b4f265d94
-Revises: fd7c7148447b
-Create Date: 2026-03-20 20:27:28.359810
+Revision ID: 44ec30f3a4a6
+Revises: 
+Create Date: 2026-03-20 23:23:35.048860
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'fe4b4f265d94'
-down_revision: Union[str, None] = 'fd7c7148447b'
+revision: str = '44ec30f3a4a6'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -39,10 +39,18 @@ def upgrade() -> None:
     sa.Column('role', sa.String(length=20), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
+    sa.Column('username', sa.String(length=50), nullable=True),
+    sa.Column('avatar_url', sa.String(length=500), nullable=True),
+    sa.Column('bio', sa.Text(), nullable=True),
+    sa.Column('rating', sa.Numeric(precision=3, scale=2), nullable=False),
+    sa.Column('total_deals_as_buyer', sa.Integer(), nullable=False),
+    sa.Column('total_deals_as_seller', sa.Integer(), nullable=False),
+    sa.Column('completed_deals', sa.Integer(), nullable=False),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('username')
     )
     op.create_index(op.f('ix_users_phone'), 'users', ['phone'], unique=True)
     op.create_table('listings',
@@ -57,7 +65,7 @@ def upgrade() -> None:
     sa.Column('skins_count', sa.Integer(), nullable=True),
     sa.Column('characters_count', sa.Integer(), nullable=True),
     sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('status', postgresql.ENUM('DRAFT', 'ACTIVE', 'SOLD', 'PAUSED', 'ARCHIVED', name='listing_status'), nullable=False),
+    sa.Column('status', postgresql.ENUM('DRAFT', 'PENDING', 'ACTIVE', 'SOLD', 'PAUSED', 'ARCHIVED', name='listing_status'), nullable=False),
     sa.Column('is_featured', sa.Boolean(), nullable=False),
     sa.Column('views_count', sa.Integer(), nullable=False),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -69,6 +77,26 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_listings_category_id'), 'listings', ['category_id'], unique=False)
     op.create_index(op.f('ix_listings_seller_id'), 'listings', ['seller_id'], unique=False)
+    op.create_table('deals',
+    sa.Column('listing_id', sa.Integer(), nullable=False),
+    sa.Column('buyer_id', sa.Integer(), nullable=False),
+    sa.Column('seller_id', sa.Integer(), nullable=False),
+    sa.Column('mediator_id', sa.Integer(), nullable=True),
+    sa.Column('status', postgresql.ENUM('PENDING', 'IN_PROGRESS', 'AWAITING_PAYMENT', 'PAYMENT_VERIFIED', 'CREDENTIALS_EXCHANGED', 'COMPLETED', 'CANCELLED', 'DISPUTED', name='deal_status'), nullable=False),
+    sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['listing_id'], ['listings.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['mediator_id'], ['users.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_deals_buyer_id'), 'deals', ['buyer_id'], unique=False)
+    op.create_index(op.f('ix_deals_listing_id'), 'deals', ['listing_id'], unique=False)
+    op.create_index(op.f('ix_deals_seller_id'), 'deals', ['seller_id'], unique=False)
+    op.create_index(op.f('ix_deals_status'), 'deals', ['status'], unique=False)
     op.create_table('listing_images',
     sa.Column('listing_id', sa.Integer(), nullable=False),
     sa.Column('image_url', sa.String(length=500), nullable=False),
@@ -82,14 +110,31 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_listing_images_listing_id'), 'listing_images', ['listing_id'], unique=False)
+    op.create_table('listing_mediators',
+    sa.Column('listing_id', sa.Integer(), nullable=False),
+    sa.Column('mediator_id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['listing_id'], ['listings.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['mediator_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('listing_id', 'mediator_id', name='unique_listing_mediator')
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade database schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_table('listing_mediators')
     op.drop_index(op.f('ix_listing_images_listing_id'), table_name='listing_images')
     op.drop_table('listing_images')
+    op.drop_index(op.f('ix_deals_status'), table_name='deals')
+    op.drop_index(op.f('ix_deals_seller_id'), table_name='deals')
+    op.drop_index(op.f('ix_deals_listing_id'), table_name='deals')
+    op.drop_index(op.f('ix_deals_buyer_id'), table_name='deals')
+    op.drop_table('deals')
     op.drop_index(op.f('ix_listings_seller_id'), table_name='listings')
     op.drop_index(op.f('ix_listings_category_id'), table_name='listings')
     op.drop_table('listings')

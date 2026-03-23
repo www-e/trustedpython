@@ -18,7 +18,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings
 from app.models.base import Base
-from app.models import User, Category, Listing, ListingImage  # Import all models here
+# Import ALL models to ensure they're registered with SQLAlchemy
+from app.models import User, Category, Listing, ListingImage, Deal, ListingMediator
 
 # This is the Alembic Config object
 config = context.config
