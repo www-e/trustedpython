@@ -1,0 +1,44 @@
+# Render Blueprint Configuration
+# Deploy with: Connect repo on Render Dashboard or use render-cli
+
+services:
+  - type: web
+    name: trustedpython
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    
+    # Environment Variables
+    # Note: Secrets (SECRET_KEY, JWT_SECRET_KEY, DATABASE_URL, REDIS_URL) 
+    # should be set via Render Dashboard for security
+    envVars:
+      - key: APP_NAME
+        value: Gaming Marketplace
+      - key: APP_VERSION
+        value: 0.1.0
+      - key: DEBUG
+        value: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 7
+      - key: CORS_ORIGINS
+        value: "*"
+      # Secrets - set these in Render Dashboard instead of committing values:
+      - key: SECRET_KEY
+        generateValue: true
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
