@@ -4,26 +4,25 @@
 
 - [x] All environment variables configured in Render
 - [x] Database migration created and tested
-- [x] Procfile created with correct entry point
-- [x] Startup script for migrations
 - [x] Security best practices implemented
 - [x] Health checks configured
 - [x] Error handling in place
 - [x] Logging configured
 
-## Environment Variables (Already Configured in Render)
+## Environment Variables (Configure in Render Dashboard)
 
 ```
 APP_NAME=Gaming Marketplace
 APP_VERSION=0.1.0
 DEBUG=false
-SECRET_KEY=<your-secret-key>
-DATABASE_URL=<your-neon-database-url>
+SECRET_KEY=<generate-strong-random-key>
+DATABASE_URL=<your-neon-postgresql-url>
 REDIS_URL=<your-upstash-redis-url>
-JWT_SECRET_KEY=<your-jwt-secret>
+JWT_SECRET_KEY=<generate-random-key>
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
-CORS_ORIGINS=["http://localhost:3000","http://localhost:8080"]
+REFRESH_TOKEN_EXPIRE_DAYS=7
+CORS_ORIGINS=*
 ```
 
 ## Deploy to Render
@@ -31,7 +30,7 @@ CORS_ORIGINS=["http://localhost:3000","http://localhost:8080"]
 ### Step 1: Push to GitHub
 ```bash
 git add .
-git commit -m "Production-ready: Fixed deployment configuration and tests"
+git commit -m "Production-ready deployment configuration"
 git push origin main
 ```
 
@@ -40,13 +39,14 @@ git push origin main
 2. Click "New +" → "Web Service"
 3. Connect your GitHub repository
 4. Configure:
-   - **Name**: gaming-marketplace
-   - **Region**: Closest to your users
-   - **Branch**: main
-   - **Root Directory**: . (leave empty for root)
+   - **Name**: `trustedpython` (or your preferred name)
+   - **Region**: Oregon (US West)
+   - **Branch**: `main`
+   - **Root Directory**: *(leave empty)*
    - **Runtime**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: (Use Procfile - will be detected automatically)
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: Free (to start) or Starter ($7/mo)
 
 ### Step 3: Verify Deployment
 

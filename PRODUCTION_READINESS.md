@@ -59,18 +59,20 @@
 - [x] ReDoc at `/redoc`
 
 ## ✅ Deployment
-- [x] Procfile created for Render
-- [x] Startup script for migrations
 - [x] Requirements.txt pinned
 - [x] Application runs on correct port ($PORT)
+- [x] Uvicorn start command configured
 
 ## Deployment Steps for Render
 
 1. Push code to GitHub
 2. Connect GitHub repository to Render
 3. Create new Web Service
-4. Configure environment variables
-5. Deploy!
+4. Configure:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Add environment variables
+6. Deploy!
 
 ## Post-Deployment Verification
 
