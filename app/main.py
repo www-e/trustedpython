@@ -18,13 +18,13 @@ async def lifespan(app: FastAPI):
     TODO: Add connection pooling for Redis in Phase 2
     """
     # Startup
-    print(f"🚀 {settings.app_name} v{settings.app_version} starting...")
-    print(f"🔧 Debug mode: {settings.debug}")
+    print(f"{settings.app_name} v{settings.app_version} starting...")
+    print(f"Debug mode: {settings.debug}")
 
     yield
 
     # Shutdown
-    print(f"👋 {settings.app_name} shutting down...")
+    print(f"{settings.app_name} shutting down...")
 
 
 # Create FastAPI app

@@ -84,3 +84,32 @@ class CategoryRepository(BaseRepository[Category]):
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_popular_categories(
+        self,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Category]:
+        """
+        Get popular categories for home screen.
+
+        Args:
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of popular categories ordered by sort_order
+        """
+        result = await self.db.execute(
+            select(Category)
+            .where(
+                and_(
+                    Category.is_active == True,
+                    Category.is_popular == True
+                )
+            )
+            .order_by(Category.sort_order, Category.name)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())

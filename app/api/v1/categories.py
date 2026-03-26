@@ -49,6 +49,7 @@ async def create_category(
 )
 async def get_categories(
     active_only: bool = Query(True, description="Only show active categories"),
+    popular_only: bool = Query(False, description="Only show popular categories (for home screen)"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=100, description="Maximum records to return"),
     db: AsyncSession = Depends(get_db)
@@ -58,11 +59,12 @@ async def get_categories(
 
     Query parameters:
     - active_only: Only return active categories (default: true)
+    - popular_only: Only return popular categories (for home screen popular games section)
     - skip: Number of records to skip (pagination)
     - limit: Maximum records to return (pagination)
     """
     service = CategoryService(db)
-    categories = await service.get_all_categories(active_only, skip, limit)
+    categories = await service.get_all_categories(active_only, popular_only, skip, limit)
     return [CategoryResponse.model_validate(c) for c in categories]
 
 

@@ -32,6 +32,13 @@ class Category(BaseModel):
         default=True,
         nullable=False
     )
+    is_popular: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        index=True,
+        comment="Whether this category is shown in popular games section"
+    )
     sort_order: Mapped[int] = mapped_column(
         Integer,
         default=0,

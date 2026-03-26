@@ -337,3 +337,26 @@ class ListingImageRepository(BaseRepository[ListingImage]):
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def unset_primary_for_listing(self, listing_id: int) -> None:
+        """
+        Unset primary flag for all images in a listing.
+
+        Args:
+            listing_id: Listing ID
+        """
+        result = await self.db.execute(
+            select(ListingImage)
+            .where(
+                and_(
+                    ListingImage.listing_id == listing_id,
+                    ListingImage.is_primary == True
+                )
+            )
+        )
+        images = list(result.scalars().all())
+
+        for image in images:
+            image.is_primary = False
+
+        await self.db.flush()

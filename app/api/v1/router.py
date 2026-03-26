@@ -9,6 +9,8 @@ from app.api.v1.listings import router as listings_router
 from app.api.v1.users import router as users_router
 from app.api.v1.deals import router as deals_router
 from app.api.v1.mediators import router as mediators_router
+from app.api.v1.exclusive_cards import router as exclusive_cards_router
+from app.api.v1.admin import router as admin_router
 
 api_router = APIRouter()
 
@@ -19,6 +21,8 @@ api_router.include_router(listings_router, tags=["Listings"])
 api_router.include_router(users_router, tags=["Users"])
 api_router.include_router(deals_router, prefix="/deals", tags=["Deals"])
 api_router.include_router(mediators_router, prefix="/mediators", tags=["Mediators"])
+api_router.include_router(exclusive_cards_router, tags=["Exclusive Cards"])
+api_router.include_router(admin_router, tags=["Admin"])
 
 
 @api_router.get("/health")

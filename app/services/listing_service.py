@@ -1,19 +1,17 @@
-"""Listing service - business logic layer."""
+"""Listing service - core business logic layer."""
 
 from typing import List, Optional
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.listing import Listing, ListingImage
-from app.models.enums import ListingStatus
 from app.repositories.listing import ListingRepository, ListingImageRepository
-from app.schemas.listing import ListingCreate, ListingUpdate, ListingImageCreate
-from app.exceptions import (
-    NotFoundError,
-    ForbiddenError,
-    ValidationError
-)
+from app.schemas.listing import ListingCreate, ListingUpdate
+from app.exceptions import NotFoundError
+from app.services.listing_auth import ListingAuthService
+from app.services.listing_status import ListingStatusService
+from app.services.listing_image import ListingImageService
+from app.services.listing_admin import ListingAdminService
 
 
 class ListingService:
@@ -21,7 +19,7 @@ class ListingService:
 
     def __init__(self, db: AsyncSession):
         """
-        Initialize listing service.
+        Initialize listing service with focused sub-services.
 
         Args:
             db: Database session
@@ -29,6 +27,14 @@ class ListingService:
         self.db = db
         self.listing_repo = ListingRepository(db)
         self.image_repo = ListingImageRepository(db)
+
+        # Sub-services for specific concerns
+        self.auth = ListingAuthService(db)
+        self.status = ListingStatusService(db)
+        self.images = ListingImageService(db)
+        self.admin = ListingAdminService(db)
+
+    # Core CRUD Operations
 
     async def create_listing(
         self,
@@ -43,12 +49,13 @@ class ListingService:
             listing_data: Listing creation data
 
         Returns:
-            Created listing
+            Created listing with images
 
         Raises:
             NotFoundError: If category not found
-            ValidationError: If data is invalid
         """
+        from app.models.enums import ListingStatus
+
         # Create listing
         listing = await self.listing_repo.create(
             seller_id=seller_id,
@@ -63,7 +70,7 @@ class ListingService:
             characters_count=listing_data.characters_count,
             price=listing_data.price,
             is_featured=listing_data.is_featured,
-            status=ListingStatus.DRAFT  # New listings start as draft
+            status=ListingStatus.DRAFT
         )
 
         # Create images if provided
@@ -99,7 +106,6 @@ class ListingService:
             raise NotFoundError(f"Listing {listing_id} not found")
 
         if increment_views:
-            # Increment views directly on the object to avoid additional queries
             listing.views_count += 1
             await self.db.flush()
 
@@ -164,20 +170,14 @@ class ListingService:
             listing_data: Update data
 
         Returns:
-            Updated listing
+            Updated listing with images
 
         Raises:
             NotFoundError: If listing not found
             ForbiddenError: If user is not the seller
         """
-        # Get listing
-        listing = await self.listing_repo.get(listing_id)
-        if not listing:
-            raise NotFoundError(f"Listing {listing_id} not found")
-
-        # Check ownership
-        if listing.seller_id != seller_id:
-            raise ForbiddenError("You don't own this listing")
+        # Verify ownership
+        await self.auth.verify_ownership(listing_id, seller_id)
 
         # Build update dict with non-None values
         update_data = {
@@ -208,17 +208,13 @@ class ListingService:
             NotFoundError: If listing not found
             ForbiddenError: If user is not the seller
         """
-        # Get listing
-        listing = await self.listing_repo.get(listing_id)
-        if not listing:
-            raise NotFoundError(f"Listing {listing_id} not found")
-
-        # Check ownership
-        if listing.seller_id != seller_id:
-            raise ForbiddenError("You don't own this listing")
+        # Verify ownership
+        await self.auth.verify_ownership(listing_id, seller_id)
 
         # Delete listing (images will be cascade deleted)
         return await self.listing_repo.delete(listing_id)
+
+    # Search Operations
 
     async def search_listings(
         self,
@@ -267,103 +263,21 @@ class ListingService:
         """
         return await self.listing_repo.get_featured_listings(limit)
 
-    async def add_listing_image(
-        self,
-        listing_id: int,
-        seller_id: int,
-        image_data: ListingImageCreate
-    ) -> ListingImage:
-        """
-        Add an image to a listing.
+    # Delegate methods to sub-services
 
-        Args:
-            listing_id: Listing ID
-            seller_id: Seller user ID (for ownership check)
-            image_data: Image data
-
-        Returns:
-            Created image
-
-        Raises:
-            NotFoundError: If listing not found
-            ForbiddenError: If user is not the seller
-        """
-        # Get listing to verify ownership
-        listing = await self.listing_repo.get(listing_id)
-        if not listing:
-            raise NotFoundError(f"Listing {listing_id} not found")
-
-        if listing.seller_id != seller_id:
-            raise ForbiddenError("You don't own this listing")
-
-        # Create image
-        image = await self.image_repo.create(
-            listing_id=listing_id,
-            image_url=image_data.image_url,
-            caption=image_data.caption,
-            sort_order=image_data.sort_order,
-            is_primary=image_data.is_primary
-        )
-
-        return image
+    async def add_listing_image(self, listing_id: int, seller_id: int, image_data) -> ListingImage:
+        """Add image to listing - delegates to image service."""
+        from app.models.listing import ListingImage
+        return await self.images.add_image(listing_id, seller_id, image_data)
 
     async def publish_listing(self, listing_id: int, seller_id: int) -> Listing:
-        """
-        Publish a listing (change status from DRAFT to ACTIVE).
-
-        Args:
-            listing_id: Listing ID
-            seller_id: Seller user ID
-
-        Returns:
-            Updated listing
-
-        Raises:
-            NotFoundError: If listing not found
-            ForbiddenError: If user is not the seller
-            ValidationError: If listing is not in draft status
-        """
-        # Get listing
-        listing = await self.listing_repo.get(listing_id)
-        if not listing:
-            raise NotFoundError(f"Listing {listing_id} not found")
-
-        # Check ownership
-        if listing.seller_id != seller_id:
-            raise ForbiddenError("You don't own this listing")
-
-        # Check status
-        if listing.status != ListingStatus.DRAFT:
-            raise ValidationError("Only draft listings can be published")
-
-        # Update status
-        updated = await self.listing_repo.update(listing_id, status=ListingStatus.ACTIVE)
-        return await self.listing_repo.get_with_images(updated.id)
+        """Publish listing - delegates to status service."""
+        return await self.status.publish_listing(listing_id, seller_id)
 
     async def pause_listing(self, listing_id: int, seller_id: int) -> Listing:
-        """
-        Pause a listing.
+        """Pause listing - delegates to status service."""
+        return await self.status.pause_listing(listing_id, seller_id)
 
-        Args:
-            listing_id: Listing ID
-            seller_id: Seller user ID
-
-        Returns:
-            Updated listing
-
-        Raises:
-            NotFoundError: If listing not found
-            ForbiddenError: If user is not the seller
-        """
-        # Get listing
-        listing = await self.listing_repo.get(listing_id)
-        if not listing:
-            raise NotFoundError(f"Listing {listing_id} not found")
-
-        # Check ownership
-        if listing.seller_id != seller_id:
-            raise ForbiddenError("You don't own this listing")
-
-        # Update status
-        updated = await self.listing_repo.update(listing_id, status=ListingStatus.PAUSED)
-        return await self.listing_repo.get_with_images(updated.id)
+    async def toggle_featured(self, listing_id: int) -> Listing:
+        """Toggle featured status - delegates to admin service."""
+        return await self.admin.toggle_featured(listing_id)

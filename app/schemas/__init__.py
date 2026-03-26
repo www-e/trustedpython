@@ -32,6 +32,11 @@ from app.schemas.mediator import (
     MediatorResponse,
     MediatorListResponse
 )
+from app.schemas.exclusive_card import (
+    ExclusiveCardCreate,
+    ExclusiveCardUpdate,
+    ExclusiveCardResponse
+)
 
 __all__ = [
     # User schemas
@@ -64,4 +69,8 @@ __all__ = [
     # Mediator schemas
     "MediatorResponse",
     "MediatorListResponse",
+    # Exclusive Card schemas
+    "ExclusiveCardCreate",
+    "ExclusiveCardUpdate",
+    "ExclusiveCardResponse",
 ]

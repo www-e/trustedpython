@@ -1,30 +1,24 @@
-"""User service - business logic layer."""
-
-from typing import Optional
-from datetime import timedelta
+"""User service - refactored with SOC."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.models.enums import UserRole
 from app.repositories.user import UserRepository
-from app.core.security import hash_password, verify_password, create_access_token
-from app.core.config import settings
 from app.schemas.user import UserCreate
-from app.exceptions import (
-    NotFoundError,
-    ValidationError,
-    AuthenticationError,
-    ConflictError
-)
+from app.exceptions import NotFoundError
+
+from app.services.user_auth import UserAuthService
+from app.services.user_profile import UserProfileService
+from app.services.user_stats import UserStatsService
+from app.services.user_password import UserPasswordService
 
 
 class UserService:
-    """Service for user-related business logic."""
+    """Service for user-related business logic (orchestrator)."""
 
     def __init__(self, db: AsyncSession):
         """
-        Initialize user service.
+        Initialize user service with focused sub-services.
 
         Args:
             db: Database session
@@ -32,78 +26,13 @@ class UserService:
         self.db = db
         self.user_repo = UserRepository(db)
 
-    async def register(self, user_data: UserCreate) -> User:
-        """
-        Register a new user.
+        # Sub-services for specific concerns
+        self.auth = UserAuthService(db)
+        self.profile = UserProfileService(db)
+        self.stats = UserStatsService(db)
+        self.password = UserPasswordService(db)
 
-        Args:
-            user_data: User registration data
-
-        Returns:
-            Created user
-
-        Raises:
-            ConflictError: If phone number already exists
-            ValidationError: If data is invalid
-        """
-        # Check if phone already exists
-        existing_user = await self.user_repo.get_by_phone(user_data.phone)
-        if existing_user:
-            raise ConflictError(
-                f"User with phone {user_data.phone} already exists"
-            )
-
-        # Hash password
-        password_hash = hash_password(user_data.password)
-
-        # Create user
-        user = await self.user_repo.create(
-            phone=user_data.phone,
-            password_hash=password_hash,
-            role=user_data.role
-        )
-
-        return user
-
-    async def login(self, phone: str, password: str) -> dict:
-        """
-        Authenticate user and return JWT token.
-
-        Args:
-            phone: User's phone number
-            password: User's password
-
-        Returns:
-            Dictionary with access token and token type
-
-        Raises:
-            AuthenticationError: If credentials are invalid
-            NotFoundError: If user not found
-        """
-        # Get user by phone
-        user = await self.user_repo.get_by_phone(phone)
-        if not user:
-            raise NotFoundError("User not found")
-
-        # Verify password
-        if not verify_password(password, user.password_hash):
-            raise AuthenticationError("Invalid password")
-
-        # Check if user is active
-        if not user.is_active:
-            raise AuthenticationError("User account is inactive")
-
-        # Create access token
-        access_token = create_access_token(
-            data={"sub": str(user.id)},
-            expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
-        )
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": user
-        }
+    # Core CRUD Operations
 
     async def get_user(self, user_id: int) -> User:
         """
@@ -152,75 +81,19 @@ class UserService:
             raise NotFoundError(f"User {user_id} not found")
         return user
 
-    async def deactivate_user(self, user_id: int) -> User:
-        """
-        Deactivate a user account.
+    # Delegate methods to sub-services
 
-        Args:
-            user_id: User ID
+    async def register(self, user_data: UserCreate) -> User:
+        """Register new user - delegates to auth service."""
+        return await self.auth.register(user_data)
 
-        Returns:
-            Deactivated user
-
-        Raises:
-            NotFoundError: If user not found
-        """
-        user = await self.user_repo.update(user_id, is_active=False)
-        if not user:
-            raise NotFoundError(f"User {user_id} not found")
-        return user
-
-    async def change_password(
-        self,
-        user_id: int,
-        old_password: str,
-        new_password: str
-    ) -> User:
-        """
-        Change user password.
-
-        Args:
-            user_id: User ID
-            old_password: Current password
-            new_password: New password
-
-        Returns:
-            Updated user
-
-        Raises:
-            NotFoundError: If user not found
-            AuthenticationError: If old password is incorrect
-            ValidationError: If new password is invalid
-        """
-        user = await self.user_repo.get(user_id)
-        if not user:
-            raise NotFoundError(f"User {user_id} not found")
-
-        # Verify old password
-        if not verify_password(old_password, user.password_hash):
-            raise AuthenticationError("Current password is incorrect")
-
-        # Validate new password
-        if len(new_password) < 8:
-            raise ValidationError("Password must be at least 8 characters")
-
-        # Hash new password
-        new_password_hash = hash_password(new_password)
-
-        # Update password
-        user = await self.user_repo.update(
-            user_id,
-            password_hash=new_password_hash
-        )
-
-        return user
+    async def login(self, phone: str, password: str) -> dict:
+        """Authenticate user - delegates to auth service."""
+        return await self.auth.login(phone, password)
 
     async def get_profile(self, user_id: int) -> User:
-        """Get user profile."""
-        user = await self.user_repo.get(user_id)
-        if not user:
-            raise NotFoundError("User not found")
-        return user
+        """Get user profile - delegates to profile service."""
+        return await self.profile.get_profile(user_id)
 
     async def update_profile(
         self,
@@ -229,87 +102,29 @@ class UserService:
         avatar_url: str | None = None,
         bio: str | None = None
     ) -> User:
-        """
-        Update user profile fields.
+        """Update user profile - delegates to profile service."""
+        return await self.profile.update_profile(user_id, username, avatar_url, bio)
 
-        Args:
-            user_id: User ID
-            username: New username
-            avatar_url: New avatar URL
-            bio: New bio
-
-        Returns:
-            Updated user
-        """
-        user = await self.user_repo.get(user_id)
-        if not user:
-            raise NotFoundError("User not found")
-
-        # Check if username is taken
-        if username and username != user.username:
-            existing = await self.user_repo.get_by_username(username)
-            if existing and existing.id != user_id:
-                raise ConflictError("Username already taken")
-
-        # Update profile
-        user = await self.user_repo.update_profile(
-            user_id,
-            username=username,
-            avatar_url=avatar_url,
-            bio=bio
-        )
-
-        return user
-
-    async def update_password_v2(
-        self,
-        user_id: int,
-        current_password: str,
-        new_password: str
-    ) -> None:
-        """
-        Change user password (new method).
-
-        Args:
-            user_id: User ID
-            current_password: Current password
-            new_password: New password
-        """
-        user = await self.user_repo.get(user_id)
-        if not user:
-            raise NotFoundError("User not found")
-
-        # Verify current password
-        if not verify_password(current_password, user.password_hash):
-            raise AuthenticationError("Current password is incorrect")
-
-        # Update password
-        from app.core.security import create_password_hash
-        password_hash = create_password_hash(new_password)
-        await self.user_repo.update_password(user_id, password_hash)
+    async def deactivate_user(self, user_id: int) -> User:
+        """Deactivate user - delegates to profile service."""
+        return await self.profile.deactivate_user(user_id)
 
     async def get_user_stats(self, user_id: int) -> dict:
-        """Get user statistics."""
-        user = await self.user_repo.get(user_id)
-        if not user:
-            raise NotFoundError("User not found")
+        """Get user statistics - delegates to stats service."""
+        return await self.stats.get_user_stats(user_id)
 
-        return {
-            "total_deals_as_buyer": user.total_deals_as_buyer,
-            "total_deals_as_seller": user.total_deals_as_seller,
-            "completed_deals": user.completed_deals,
-            "rating": float(user.rating),
-        }
+    async def get_trade_history(self, user_id: int, limit: int = 20, offset: int = 0) -> list:
+        """Get trade history - delegates to stats service."""
+        return await self.stats.get_trade_history(user_id, limit, offset)
 
-    async def get_mediators(
-        self,
-        min_rating: float = 0.0,
-        limit: int = 100,
-        offset: int = 0
-    ) -> list[User]:
-        """Get list of available mediators."""
-        return await self.user_repo.get_mediators(
-            min_rating=min_rating,
-            skip=offset,
-            limit=limit
-        )
+    async def get_mediators(self, min_rating: float = 0.0, limit: int = 100, offset: int = 0) -> list[User]:
+        """Get mediators - delegates to stats service."""
+        return await self.stats.get_mediators(min_rating, limit, offset)
+
+    async def change_password(self, user_id: int, old_password: str, new_password: str) -> None:
+        """Change password - delegates to password service."""
+        return await self.password.change_password(user_id, old_password, new_password)
+
+    async def update_password_v2(self, user_id: int, current_password: str, new_password: str) -> None:
+        """Change password (v2) - delegates to password service."""
+        return await self.password.change_password(user_id, current_password, new_password)

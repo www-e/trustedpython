@@ -122,3 +122,34 @@ async def get_user_stats(
         return stats
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/me/trades")
+async def get_my_trade_history(
+    limit: int = 20,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get current user's trade history.
+
+    Returns deals where user was buyer or seller,
+    ordered by most recent first.
+    """
+    try:
+        trades = await UserService(db).get_trade_history(
+            current_user.id,
+            limit=limit,
+            offset=offset
+        )
+        return {
+            "items": trades,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": len(trades)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

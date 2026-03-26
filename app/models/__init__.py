@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.listing import Category, Listing, ListingImage
 from app.models.deal import Deal
 from app.models.listing_mediator import ListingMediator
+from app.models.exclusive_card import ExclusiveCard
 
 __all__ = [
     "BaseModel",
@@ -18,5 +19,6 @@ __all__ = [
     "Listing",
     "ListingImage",
     "Deal",
-    "ListingMediator"
+    "ListingMediator",
+    "ExclusiveCard",
 ]

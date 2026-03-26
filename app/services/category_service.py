@@ -78,6 +78,7 @@ class CategoryService:
     async def get_all_categories(
         self,
         active_only: bool = True,
+        popular_only: bool = False,
         skip: int = 0,
         limit: int = 100
     ) -> List[Category]:
@@ -86,12 +87,15 @@ class CategoryService:
 
         Args:
             active_only: Only return active categories
+            popular_only: Only return popular categories (for home screen)
             skip: Number of records to skip
             limit: Maximum number of records to return
 
         Returns:
             List of categories
         """
+        if popular_only:
+            return await self.category_repo.get_popular_categories(skip, limit)
         if active_only:
             return await self.category_repo.get_active_categories(skip, limit)
         return await self.category_repo.get_all(skip, limit)
