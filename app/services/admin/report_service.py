@@ -42,6 +42,8 @@ class ReportService:
         """
         Get user reports.
 
+        Requires Report model - not yet implemented.
+
         Args:
             status: Filter by status (pending, resolved, dismissed)
             type: Filter by type (user, listing, message, deal)
@@ -49,19 +51,18 @@ class ReportService:
             limit: Items per page
 
         Returns:
-            ReportsResponse: List of reports
-
-        Note:
-            This is a placeholder implementation. In production, you would
-            need a Report model to store user reports.
+            ReportsResponse: Empty response indicating feature is not implemented
         """
-        # Placeholder implementation
-        # In production, query from a Report model
-        return ReportsResponse(reports=[], pagination={"page": page, "limit": limit, "total": 0})
+        return ReportsResponse(
+            reports=[],
+            pagination={"page": page, "limit": limit, "total": 0},
+        )
 
     async def get_report_details(self, report_id: UUID) -> Dict[str, Any]:
         """
         Get report details.
+
+        Requires Report model - not yet implemented.
 
         Args:
             report_id: Report ID
@@ -70,18 +71,15 @@ class ReportService:
             Report details
 
         Raises:
-            NotFoundException: If report not found
-
-        Note:
-            This is a placeholder implementation. In production, you would
-            need a Report model to store user reports.
+            NotFoundException: Always - Report model not implemented
         """
-        # Placeholder implementation
-        raise NotFoundException(str(report_id), "Report")
+        raise NotFoundException(str(report_id), "Report model - not yet implemented")
 
     async def resolve_report(self, report_id: UUID, action: str, notes: str) -> Dict[str, Any]:
         """
         Resolve a report.
+
+        Requires Report model - not yet implemented.
 
         Args:
             report_id: Report ID
@@ -92,17 +90,9 @@ class ReportService:
             Dict with success message
 
         Raises:
-            NotFoundException: If report not found
-
-        Note:
-            This is a placeholder implementation. In production, you would
-            need a Report model to store user reports.
+            NotFoundException: Always - Report model not implemented
         """
-        # Placeholder implementation
-        await self._log_admin_action(
-            "resolve_report", report_id, f"Action: {action}, Notes: {notes}"
-        )
-        return {"message": "Report resolved successfully"}
+        raise NotFoundException(str(report_id), "Report model - not yet implemented")
 
     async def get_blocked_users(self, page: int = 1, limit: int = 20) -> BlockedUsersResponse:
         """

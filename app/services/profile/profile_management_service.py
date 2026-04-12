@@ -4,10 +4,12 @@ Profile management service.
 Handles user profile CRUD operations, stats calculation, and trade history.
 """
 
+import io
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+from fastapi import UploadFile
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -264,9 +266,16 @@ class ProfileManagementService:
         if file_ext not in allowed_extensions:
             raise ValidationError("Invalid file type. Only JPG, JPEG, PNG allowed")
 
-        # TODO: Implement actual upload to MinIO/S3
-        # For now, generate a mock URL
-        avatar_url = f"https://storage.example.com/avatars/{user_id}/{filename}"
+        # Upload to storage
+        from app.utils.storage import upload_file_to_storage
+        
+        upload_file = UploadFile(
+            file=io.BytesIO(file_data),
+            size=len(file_data),
+            filename=filename,
+            headers={"content-type": f"image/{file_ext.lstrip('.')}"},
+        )
+        avatar_url = await upload_file_to_storage(upload_file, folder="avatars")
 
         # Update profile
         profile = await get_profile(self.db, user_id)

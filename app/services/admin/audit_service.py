@@ -43,6 +43,8 @@ class AuditService:
         """
         Log an admin action to the audit trail.
 
+        Requires audit log table - not yet implemented.
+
         Args:
             admin_id: ID of the admin performing the action
             action: Action performed (e.g., 'verify_user', 'ban_user')
@@ -52,10 +54,6 @@ class AuditService:
 
         Returns:
             Dict containing the audit log entry
-
-        Note:
-            In production, this should write to a dedicated audit log table
-            or external logging service. For now, returns formatted dict.
         """
         audit_entry = {
             "admin_id": str(admin_id),
@@ -64,16 +62,9 @@ class AuditService:
             "entity_id": str(entity_id) if entity_id else None,
             "details": details or {},
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "note": "Audit log table not yet implemented - entry not persisted",
         }
 
-        # TODO: Implement actual audit log storage
-        # Options:
-        # 1. Create AuditLog model and store in database
-        # 2. Send to external logging service (e.g., Sentry, DataDog)
-        # 3. Write to dedicated audit log file
-        # 4. Use structured logging with loguru
-
-        # For now, log to Python logger
         import logging
 
         logger = logging.getLogger(__name__)
@@ -87,18 +78,15 @@ class AuditService:
         """
         Get recent action history for an admin.
 
+        Requires audit log table - not yet implemented.
+
         Args:
             admin_id: ID of the admin
             limit: Maximum number of actions to return
 
         Returns:
-            List of recent admin actions
-
-        Note:
-            This is a placeholder. Implement with actual audit log storage.
+            Empty list - audit log table not implemented
         """
-        # TODO: Implement actual audit log retrieval
-        # This would query the AuditLog model or external service
         return []
 
     async def get_entity_audit_trail(
@@ -107,15 +95,13 @@ class AuditService:
         """
         Get complete audit trail for an entity.
 
+        Requires audit log table - not yet implemented.
+
         Args:
             entity_type: Type of entity
             entity_id: ID of the entity
 
         Returns:
-            List of all admin actions on this entity
-
-        Note:
-            This is a placeholder. Implement with actual audit log storage.
+            Empty list - audit log table not implemented
         """
-        # TODO: Implement actual audit trail retrieval
         return []

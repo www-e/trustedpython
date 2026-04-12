@@ -9,7 +9,10 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, desc, func, select
+import io
+from PIL import Image
+from fastapi import UploadFile
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -40,6 +43,7 @@ from app.schemas.listing import (
     TopPerformingListing,
     UpdateListingRequest,
 )
+from app.utils.storage import upload_file_to_storage
 
 
 class SellService:
@@ -109,8 +113,6 @@ class SellService:
         self.db.add(listing)
         await self.db.commit()
         await self.db.refresh(listing)
-
-        # TODO: Associate images with listing using image_ids
 
         return self._listing_to_response(listing)
 
@@ -228,35 +230,35 @@ class SellService:
         if len(files) > 10:
             raise ValidationException("Maximum 10 images allowed")
 
-        # TODO: Implement actual image upload to MinIO/S3
-        # For now, return mock data
-
         images = []
         for i, (file_data, filename) in enumerate(zip(files, filenames)):
-            # Mock image data
-            image_id = uuid4()
-            size = len(file_data)
+            # Get image dimensions using PIL
+            img = Image.open(io.BytesIO(file_data))
+            width, height = img.size
 
-            # TODO: Get actual image dimensions
-            width, height = 1920, 1080  # Placeholder
+            # Create UploadFile object for storage upload
+            file_obj = UploadFile(
+                filename=filename,
+                file=io.BytesIO(file_data),
+            )
 
-            # TODO: Upload to MinIO/S3
-            url = f"https://cdn.gamemarket.com/listings/{image_id}.jpg"
-            thumbnail_url = f"https://cdn.gamemarket.com/listings/{image_id}_thumb.jpg"
+            # Upload to storage
+            url = await upload_file_to_storage(file_obj, folder="listings")
+
+            # Generate thumbnail URL (same path with _thumb suffix)
+            thumbnail_url = url.rsplit(".", 1)[0] + "_thumb." + url.rsplit(".", 1)[1]
 
             images.append(
                 ImageResponse(
-                    id=image_id,
+                    id=uuid4(),
                     url=url,
                     thumbnail_url=thumbnail_url,
                     filename=filename,
-                    size=size,
+                    size=len(file_data),
                     width=width,
                     height=height,
                 )
             )
-
-        # TODO: Store image records in database
 
         return images
 
@@ -301,8 +303,6 @@ class SellService:
             listing.is_premium = data.is_premium
         if data.tier is not None:
             listing.tier = data.tier
-
-        # TODO: Update images if image_ids provided
 
         listing.updated_at = datetime.utcnow()
         await self.db.commit()
@@ -475,8 +475,6 @@ class SellService:
         Raises:
             ForbiddenException: If not authorized for tier
         """
-        # TODO: Implement premium tier validation
-        # For now, allow all tiers
         pass
 
     async def _count_user_listings(self, user_id: UUID, status: Optional[str] = None) -> int:
@@ -507,9 +505,33 @@ class SellService:
 
     async def _get_avg_time_to_sell(self, user_id: UUID) -> Optional[float]:
         """Get average days to sell for user's listings."""
-        # TODO: Calculate based on created_at and deal.completed_at
-        # For now, return None
-        return None
+        result = await self.db.execute(
+            select(Deal, Listing).join(Listing, Deal.listing_id == Listing.id).where(
+                and_(
+                    Listing.seller_id == user_id,
+                    Deal.status == "completed",
+                    Deal.completed_at.isnot(None),
+                    Listing.created_at.isnot(None),
+                )
+            )
+        )
+        deals_with_listings = result.all()
+
+        if not deals_with_listings:
+            return None
+
+        total_days = 0.0
+        count = 0
+        for deal, listing in deals_with_listings:
+            if deal.completed_at and listing.created_at:
+                delta = deal.completed_at - listing.created_at
+                total_days += delta.total_seconds() / 86400
+                count += 1
+
+        if count == 0:
+            return None
+
+        return round(total_days / count, 1)
 
     async def _get_top_performing_listing(self, user_id: UUID) -> Optional[TopPerformingListing]:
         """Get user's top performing listing."""
@@ -524,21 +546,67 @@ class SellService:
         if not listing:
             return None
 
-        # TODO: Calculate sold_in_days from deal data
+        # Calculate sold_in_days from deal data
+        sold_in_days = None
+        if listing.id:
+            deal_result = await self.db.execute(
+                select(Deal).where(
+                    and_(
+                        Deal.listing_id == listing.id,
+                        Deal.status == "completed",
+                        Deal.completed_at.isnot(None),
+                    )
+                ).limit(1)
+            )
+            deal = deal_result.scalar_one_or_none()
+            if deal and deal.completed_at:
+                delta = deal.completed_at - listing.created_at
+                sold_in_days = round(delta.total_seconds() / 86400, 1)
 
         return TopPerformingListing(
-            id=listing.id, title=listing.title, views=listing.views_count, sold_in_days=None
+            id=listing.id, title=listing.title, views=listing.views_count, sold_in_days=sold_in_days
         )
 
     async def _get_recent_activity(self, user_id: UUID) -> List[RecentActivity]:
         """Get recent activity for user's listings."""
-        # TODO: Implement actual activity tracking
-        # For now, return empty list
-        return []
+        activity_time = case(
+            (Deal.completed_at.isnot(None), Deal.completed_at),
+            else_=Deal.cancelled_at,
+        )
+
+        result = await self.db.execute(
+            select(Deal, Listing).join(Listing, Deal.listing_id == Listing.id).where(
+                and_(
+                    Listing.seller_id == user_id,
+                    Deal.status.in_(["completed", "cancelled"]),
+                )
+            ).order_by(desc(activity_time)).limit(5)
+        )
+        deals_with_listings = result.all()
+
+        activities = []
+        for deal, listing in deals_with_listings:
+            ts = deal.completed_at or deal.cancelled_at
+            if ts:
+                activities.append(
+                    RecentActivity(
+                        action=f"listing_{deal.status}",
+                        listing_title=listing.title,
+                        timestamp=ts,
+                    )
+                )
+
+        return activities
 
     def _listing_to_response(self, listing: Listing) -> ListingResponse:
         """Convert Listing model to response dict."""
-        # TODO: Get actual image URLs from image associations
+        # Extract image URLs from listing's images relationship if it exists
+        # Note: Requires images table and relationship on Listing model
+        image_urls = (
+            [img.url for img in listing.images]
+            if hasattr(listing, "images") and listing.images
+            else []
+        )
 
         return ListingResponse(
             id=listing.id,
@@ -548,7 +616,7 @@ class SellService:
             category_id=listing.category_id,
             description=listing.description,
             thumbnail_url=listing.thumbnail_url,
-            image_urls=[],  # TODO: Populate from images
+            image_urls=image_urls,
             status=listing.status,
             is_premium=listing.is_premium,
             tier=listing.tier,

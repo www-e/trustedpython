@@ -5,14 +5,18 @@ Handles payment submission, verification, and status checking
 for deals in the buy flow.
 """
 
+import io
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi import status as http_status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.exceptions import ForbiddenException
+from app.models.deal import Deal
 from app.models.user import User
 from app.schemas.common import APIResponse
 from app.schemas.deal import ConfirmPaymentRequest, PaymentStatusResponse, RejectPaymentRequest
@@ -62,9 +66,11 @@ async def submit_payment(
                 status_code=http_status.HTTP_400_BAD_REQUEST, detail="File size exceeds 5MB limit"
             )
 
-        # TODO: Upload file to storage service
-        # For now, use a placeholder URL
-        screenshot_url = f"https://storage.example.com/payments/{deal_id}/{screenshot.filename}"
+        # Upload file to storage service
+        from app.utils.storage import upload_file_to_storage
+        
+        screenshot.file = io.BytesIO(content)
+        screenshot_url = await upload_file_to_storage(screenshot, folder=f"payments/{deal_id}")
 
         service = BuyService(db)
         result = await service.submit_payment(
@@ -103,7 +109,14 @@ async def confirm_payment(
     Optional notes can be added for documentation.
     """
     try:
-        # TODO: Verify user is mediator for this deal
+        result = await db.execute(select(Deal).where(Deal.id == deal_id))
+        deal = result.scalar_one_or_none()
+        if not deal:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND, detail="Deal not found"
+            )
+        if deal.mediator_id != current_user.id:
+            raise ForbiddenException("Only the deal mediator can confirm payment")
         service = BuyService(db)
         result = await service.confirm_payment(deal_id=deal_id, notes=request.notes)
         return APIResponse.success_response(data=result, message="Payment confirmed successfully")
@@ -140,7 +153,14 @@ async def reject_payment(
     A reason (min 10 characters) is required for rejection.
     """
     try:
-        # TODO: Verify user is mediator for this deal
+        result = await db.execute(select(Deal).where(Deal.id == deal_id))
+        deal = result.scalar_one_or_none()
+        if not deal:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND, detail="Deal not found"
+            )
+        if deal.mediator_id != current_user.id:
+            raise ForbiddenException("Only the deal mediator can reject payment")
         service = BuyService(db)
         result = await service.reject_payment(deal_id=deal_id, reason=request.reason)
         return APIResponse.success_response(data=result, message="Payment rejected")

@@ -181,7 +181,7 @@ async def calculate_detailed_stats(db: AsyncSession, user_id: UUID) -> dict:
         "total_revenue": float(total_revenue) if total_revenue else None,
         "avg_deal_value": avg_deal_value,
         "success_rate": round(success_rate, 2),
-        "response_time_avg": None,  # TODO: Calculate from chat response times
+        "response_time_avg": None,  # Requires chat analytics - future enhancement
     }
 
 

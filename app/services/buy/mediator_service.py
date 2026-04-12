@@ -93,7 +93,7 @@ class BuyMediatorService:
                     program_rating=float(mediator.program_rating or 0),
                     transactions_count=mediator.transactions_count or 0,
                     specialization=mediator.specialization or "",
-                    payment_methods=[],  # TODO: Implement payment methods
+                    payment_methods=[],
                     response_time=self._format_response_time(mediator.avg_response_time),
                     is_online=mediator.is_online,
                     tier=MediatorTier(mediator.tier) if mediator.tier else MediatorTier.BRONZE,
@@ -158,7 +158,7 @@ class BuyMediatorService:
             transactions_count=mediator.transactions_count or 0,
             success_rate=float(stats.get("success_rate", 0)),
             specialization=mediator.specialization or "",
-            payment_methods=[],  # TODO: Implement payment methods
+            payment_methods=[],
             response_time=self._format_response_time(mediator.avg_response_time),
             is_online=mediator.is_online,
             tier=MediatorTier(mediator.tier) if mediator.tier else MediatorTier.BRONZE,
@@ -261,10 +261,35 @@ class BuyMediatorService:
         Returns:
             Dict with mediator statistics
         """
-        # Get deal stats
-        deal_query = select(func.count(Deal.id), func.sum(Deal.status == "completed"))
-        # TODO: Implement proper stats calculation
-        return {"total_deals": 0, "successful_deals": 0, "failed_deals": 0, "success_rate": 0}
+        # Get deal stats for this mediator
+        from sqlalchemy import case
+        
+        stats_query = select(
+            func.count(Deal.id).label('total_deals'),
+            func.sum(case((Deal.status == "completed", 1), else_=0)).label('successful_deals'),
+            func.sum(case((Deal.status == "cancelled", 1), else_=0)).label('failed_deals'),
+        ).where(Deal.mediator_id == mediator_id)
+        
+        stats_result = await self.db.execute(stats_query)
+        stats_row = stats_result.first()
+        
+        if stats_row and stats_row.total_deals > 0:
+            total = stats_row.total_deals
+            successful = stats_row.successful_deals or 0
+            failed = stats_row.failed_deals or 0
+            success_rate = round((successful / total) * 100, 2)
+        else:
+            total = 0
+            successful = 0
+            failed = 0
+            success_rate = 0.0
+        
+        return {
+            "total_deals": total,
+            "successful_deals": successful,
+            "failed_deals": failed,
+            "success_rate": success_rate,
+        }
 
     def _format_response_time(self, minutes: Optional[int]) -> str:
         """

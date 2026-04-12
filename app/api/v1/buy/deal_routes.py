@@ -9,10 +9,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status as http_status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.exceptions import ForbiddenException
+from app.models.deal import Deal
 from app.models.user import User
 from app.schemas.common import APIResponse
 from app.schemas.deal import (
@@ -126,7 +129,14 @@ async def update_deal_status(
     Notes are optional but recommended for status changes.
     """
     try:
-        # TODO: Verify user is mediator for this deal
+        result = await db.execute(select(Deal).where(Deal.id == deal_id))
+        deal = result.scalar_one_or_none()
+        if not deal:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND, detail="Deal not found"
+            )
+        if deal.mediator_id != current_user.id:
+            raise ForbiddenException("Only the deal mediator can update deal status")
         service = BuyService(db)
         result = await service.update_deal_status(
             deal_id=deal_id, status=request.status, notes=request.notes

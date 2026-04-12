@@ -326,7 +326,7 @@ class AccountBrowsingService:
         levels_result = await self.db.execute(levels_query)
         levels = [l[0] for l in levels_result.all() if l[0]]
 
-        # Price ranges (hardcoded for now)
+        # Default price ranges - can be made configurable via admin panel
         price_ranges = [
             PriceRangeSchema(label="Under $100", min=0, max=100),
             PriceRangeSchema(label="$100 - $300", min=100, max=300),

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -28,6 +28,7 @@ from app.core.security import (
     verify_password,
     verify_token,
 )
+from app.models.review import Review
 from app.models.user import User, UserProfile
 
 
@@ -272,7 +273,7 @@ class AuthService:
         if not user:
             raise NotFoundException(str(user_id), "User")
 
-        return self._user_to_full_response(user)
+        return await self._user_to_full_response(user)
 
     async def verify_email(self, token: str) -> None:
         """
@@ -375,7 +376,7 @@ class AuthService:
             "created_at": user.created_at,
         }
 
-    def _user_to_full_response(self, user: User) -> dict:
+    async def _user_to_full_response(self, user: User) -> dict:
         """
         Convert User model to full response dict with stats.
 
@@ -386,6 +387,10 @@ class AuthService:
             dict: Full user response data
         """
         profile = user.profile
+
+        reviews_count = await self.db.scalar(
+            select(func.count(Review.id)).where(Review.reviewee_id == user.id)
+        )
 
         return {
             "id": user.id,
@@ -400,6 +405,6 @@ class AuthService:
                 "total_sales": profile.accounts_sold if profile else 0,
                 "total_purchases": profile.bought_count if profile else 0,
                 "rating": float(profile.rating) if profile else 0.0,
-                "reviews_count": 0,  # TODO: Calculate from reviews table
+                "reviews_count": reviews_count or 0,
             },
         }

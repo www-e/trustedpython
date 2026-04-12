@@ -169,7 +169,7 @@ class ListingManagementService:
             game=listing.game,
             description=listing.description,
             thumbnail_url=listing.thumbnail_url,
-            image_urls=[],  # TODO: Load from images table
+            image_urls=[img.url for img in getattr(listing, "images", [])] if hasattr(listing, "images") else [],
             status=listing.status,
             is_premium=listing.is_premium,
             tier=listing.tier,
@@ -319,11 +319,19 @@ class ListingManagementService:
         if file_ext not in allowed_extensions:
             raise ValidationError("Invalid file type. Only JPG, JPEG, PNG allowed")
 
-        # TODO: Implement actual upload to MinIO/S3
-        # TODO: Implement malware scanning
+        # Upload to storage
+        from app.utils.storage import upload_file_to_storage
+        
+        upload_file = UploadFile(
+            file=io.BytesIO(file_data),
+            size=len(file_data),
+            filename=filename,
+            headers={"content-type": f"image/{file_ext.lstrip('.')}"},
+        )
+        image_url = await upload_file_to_storage(upload_file, folder="listings")
         image_id = str(uuid4())
-        image_url = f"https://storage.example.com/listings/{image_id}/{filename}"
 
+        # Note: Malware scanning should be implemented before production
         return UploadImageResponse(
             id=image_id, url=image_url, filename=filename, size=len(file_data)
         )
