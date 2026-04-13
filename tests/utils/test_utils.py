@@ -16,19 +16,28 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_upload_file_returns_url(self):
         """Test upload file returns URL."""
-        with patch("app.utils.storage.MinIO") as mock_minio:
+        import asyncio
+        
+        # Create a proper async mock for file.read()
+        async def mock_read():
+            return b"test content"
+        
+        # Mock the Minio client
+        with patch("app.utils.storage.Minio") as mock_minio:
             mock_client = MagicMock()
             mock_minio.return_value = mock_client
+            mock_client.bucket_exists.return_value = True
             mock_client.put_object = MagicMock()
-            
+
+            # Create a proper mock UploadFile
             file = MagicMock()
             file.filename = "test.jpg"
-            file.file = BytesIO(b"test content")
-            
-            # Mock should return URL
+            file.content_type = "image/jpeg"
+            file.read = mock_read  # Async function
+
             result = await upload_file_to_storage(file, folder="test")
             assert isinstance(result, str)
-            assert "http" in result.lower() or "test" in result.lower()
+            assert "http" in result.lower()
 
 
 class TestRedisPubSub:

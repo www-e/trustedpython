@@ -275,3 +275,6 @@ pytest tests/ -v
 # Run with coverage
 pytest tests/ -v --cov=app --cov-report=term-missing
 ```
+
+
+qwen --resume ec3eb491-4131-4ccf-8ba1-8ad5b0c7aecf

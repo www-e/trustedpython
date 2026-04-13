@@ -10,7 +10,10 @@ from pydantic import ValidationError
 from app.schemas.user import UserResponse, UserCreate, LoginRequest
 from app.schemas.common import APIResponse, ErrorResponse, PaginationSchema
 from app.schemas.listing import ListingResponse, CreateListingRequest
-from app.schemas.deal import DealResponse, CreateDealRequest
+from app.schemas.deal import (
+    DealResponse, CreateDealRequest, DealStatus, PaymentStatus,
+    AccountSummarySchema, MediatorSummarySchema, UserSummarySchema, PaymentInfoSchema
+)
 from app.schemas.chat import ChatRoomResponse, MessageResponse, SendMessageRequest
 from app.schemas.notification import NotificationResponse, CreateNotificationRequest
 from app.schemas.security import (
@@ -21,7 +24,7 @@ from app.schemas.security import (
     SuccessResponse,
 )
 from app.schemas.home import HomeFeedResponse, FeaturedAccountsResponse
-from app.schemas.admin import AdminUserResponse, AdminListingResponse
+from app.schemas.admin import UserDetailResponse, ListingModerationResponse
 
 
 class TestUserSchemas:
@@ -65,15 +68,16 @@ class TestUserSchemas:
 
     def test_user_response(self):
         """Test user response schema."""
-        user_id = uuid4()
+        # UserResponse has required fields including id (int), created_at
         response = UserResponse(
-            id=user_id,
+            id=1,
             username="testuser",
             email="test@example.com",
-            is_active=True,
+            is_verified=True,
+            created_at=datetime.utcnow(),
         )
         assert response.username == "testuser"
-        assert response.is_active is True
+        assert response.is_verified is True
 
 
 class TestCommonSchemas:
@@ -90,7 +94,7 @@ class TestCommonSchemas:
 
     def test_api_response_create(self):
         """Test APIResponse create method."""
-        response = APIResponse.create(
+        response = APIResponse.success_response(
             data={"key": "value"},
             message="Success",
         )
@@ -117,7 +121,7 @@ class TestCommonSchemas:
         assert pagination.page == 1
         assert pagination.limit == 20
         assert pagination.total == 100
-        assert pagination.pages == 5
+        assert pagination.total_pages == 5
         assert pagination.has_next is True
 
     def test_pagination_schema_no_next(self):
@@ -135,11 +139,15 @@ class TestListingSchemas:
 
     def test_create_listing_request_valid(self):
         """Test valid listing creation."""
+        # CreateListingRequest requires category_id and at least 1 image
+        from uuid import uuid4
         data = CreateListingRequest(
             title="Epic Gaming Account",
             price=99.99,
             game="Fortnite",
+            category_id=uuid4(),
             description="Level 500",
+            image_ids=[uuid4()],
         )
         assert data.title == "Epic Gaming Account"
         assert data.price == 99.99
@@ -160,10 +168,12 @@ class TestListingSchemas:
             title="Epic Gaming Account",
             price=99.99,
             game="Fortnite",
-            is_published=True,
+            status="active",
+            is_premium=False,
+            created_at=datetime.utcnow(),
         )
         assert response.title == "Epic Gaming Account"
-        assert response.is_published is True
+        assert response.status == "active"
 
 
 class TestDealSchemas:
@@ -171,24 +181,31 @@ class TestDealSchemas:
 
     def test_create_deal_request(self):
         """Test creating a deal request."""
-        listing_id = uuid4()
+        # CreateDealRequest uses account_id and mediator_id (not listing_id and offer_price)
         data = CreateDealRequest(
-            listing_id=listing_id,
-            offer_price=89.99,
-            message="Interested",
+            account_id=str(uuid4()),
+            mediator_id=str(uuid4()),
+            notes="Interested",
         )
-        assert data.offer_price == 89.99
+        assert data.notes == "Interested"
 
     def test_deal_response(self):
         """Test deal response schema."""
-        deal_id = uuid4()
+        deal_id = str(uuid4())
+        # DealResponse requires buyer_id, seller_id, chat_room_id
         response = DealResponse(
             id=deal_id,
-            status="pending",
+            status=DealStatus.PENDING,
             total_amount=99.99,
             currency="EGP",
+            account=AccountSummarySchema(id="1", title="Test Account", price=99.99, game="Fortnite"),
+            mediator=MediatorSummarySchema(id="1", name="Mediator", avatar=""),
+            buyer_id=str(uuid4()),
+            seller_id=str(uuid4()),
+            chat_room_id=str(uuid4()),
+            created_at=datetime.utcnow(),
         )
-        assert response.status == "pending"
+        assert response.status == DealStatus.PENDING
 
 
 class TestChatSchemas:
@@ -204,31 +221,27 @@ class TestChatSchemas:
 
     def test_message_response(self):
         """Test message response schema."""
-        message_id = uuid4()
-        sender_id = uuid4()
+        message_id = str(uuid4())
+        sender_id = str(uuid4())
         response = MessageResponse(
             id=message_id,
             sender_id=sender_id,
             sender_name="TestUser",
             content="Hello!",
             type="text",
-            timestamp=datetime.now(),
-            is_read=False,
-            attachments=[],
+            timestamp=datetime.utcnow(),
         )
         assert response.content == "Hello!"
 
     def test_chat_room_response(self):
         """Test chat room response schema."""
-        room_id = uuid4()
+        room_id = str(uuid4())
         response = ChatRoomResponse(
             id=room_id,
             name="Test Room",
             type="private",
-            participants=[],
-            unread_count=0,
             is_active=True,
-            created_at=datetime.now(),
+            created_at=datetime.utcnow(),
         )
         assert response.type == "private"
 
@@ -238,25 +251,29 @@ class TestNotificationSchemas:
 
     def test_create_notification_request(self):
         """Test creating notification request."""
+        from app.schemas.notification import NotificationType
         data = CreateNotificationRequest(
+            user_id=uuid4(),
             title="Test",
-            message="Test message",
-            type="info",
+            description="Test message",  # Field is 'description' not 'message'
+            type=NotificationType.SYSTEM,
         )
         assert data.title == "Test"
 
     def test_notification_response(self):
         """Test notification response schema."""
         notif_id = uuid4()
+        from app.schemas.notification import NotificationType
         response = NotificationResponse(
             id=notif_id,
             title="Test",
-            message="Test message",
-            type="info",
+            description="Test message",  # Field is 'description' not 'message'
+            type=NotificationType.SYSTEM,
             is_read=False,
-            created_at=datetime.now(),
+            created_at=datetime.utcnow(),
+            relative_time="just now",
         )
-        assert response.type == "info"
+        assert response.type == NotificationType.SYSTEM
 
 
 class TestSecuritySchemas:
@@ -279,8 +296,9 @@ class TestSecuritySchemas:
         """Test security score response."""
         response = SecurityScoreResponse(
             score=85,
-            level="good",
             vulnerabilities=[],
+            recommendations=["Enable 2FA"],
+            last_updated=datetime.utcnow(),
         )
         assert response.score == 85
 
@@ -300,10 +318,12 @@ class TestHomeSchemas:
     def test_home_feed_response(self):
         """Test home feed response schema."""
         response = HomeFeedResponse(
-            items=[],
-            total=0,
+            featured_accounts=[],
+            accounts=[],
+            categories=[],
+            pagination={"page": 1, "total": 0, "total_pages": 0, "has_next": False, "has_prev": False},
         )
-        assert response.total == 0
+        assert len(response.accounts) == 0
 
     def test_featured_accounts_response(self):
         """Test featured accounts response."""
@@ -316,24 +336,67 @@ class TestHomeSchemas:
 class TestAdminSchemas:
     """Test admin-related schemas."""
 
-    def test_admin_user_response(self):
-        """Test admin user response."""
+    def test_user_detail_response(self):
+        """Test user detail response."""
+        from app.schemas.admin import UserProfileInDetail, LoginHistoryItem
+        from datetime import date
+
         user_id = uuid4()
-        response = AdminUserResponse(
-            id=user_id,
+        response = UserDetailResponse(
+            id=str(user_id),
             username="admin",
             email="admin@example.com",
-            is_active=True,
+            phone="+1234567890",
+            display_name="Admin",
+            avatar_url=None,
+            is_verified=True,
+            is_email_verified=True,
             is_suspended=False,
+            suspension_reason=None,
+            is_banned=False,
+            ban_reason=None,
+            profile=UserProfileInDetail(
+                bio=None,
+                user_role="Trader",
+                member_since=date.today(),
+                completed_deals=0,
+                rating=0.0,
+                accounts_sold=0,
+                bought_count=0,
+            ),
+            listings=0,
+            active_deals=0,
+            reports_against=0,
+            login_history=[],
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         assert response.username == "admin"
 
-    def test_admin_listing_response(self):
-        """Test admin listing response."""
+    def test_listing_moderation_response(self):
+        """Test listing moderation response."""
+        from app.schemas.admin import ListingInModeration, SellerInListing
+        
         listing_id = uuid4()
-        response = AdminListingResponse(
-            id=listing_id,
-            title="Test Listing",
-            status="pending",
+        response = ListingModerationResponse(
+            listings=[
+                ListingInModeration(
+                    id=str(listing_id),
+                    title="Test Listing",
+                    price=99.99,
+                    game="Valorant",
+                    seller=SellerInListing(
+                        id=str(uuid4()),
+                        username="seller123",
+                        is_verified=False,
+                    ),
+                    status="pending",
+                    image_urls=[],
+                    created_at=datetime.utcnow(),
+                    waiting_hours=2.5,
+                )
+            ],
+            pagination={"page": 1, "total": 1, "total_pages": 1},
         )
-        assert response.status == "pending"
+        assert len(response.listings) == 1
+        assert response.listings[0].title == "Test Listing"
