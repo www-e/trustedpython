@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "bunnycdn": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "bunnycdn-mcp"
+      ],
+      "env": {
+        "BUNNY_API_KEY": "3424bb26-521a-4b88-b58f-5196f79fb6dd35707b7d-3bcf-451f-a10e-817bf49f5a9d",
+        "BUNNY_STREAM_KEY": "bca1ec87-3748-46e9-b63b29fb9aea-9bce-424c",
+        "BUNNY_STORAGE_KEY": "23f5b5cb-ae72-4a7c-b54be0990385-c3f8-48b8"
+      }
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@playwright/mcp@latest"
+      ],
+      "env": {
+        "PW_BROWSER": "chromium",
+        "PW_HEADLESS": "false"
+      }
+    }
+  }
+}

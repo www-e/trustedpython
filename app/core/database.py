@@ -1,14 +1,13 @@
 """
 Database connection and session management.
 
-This is a placeholder module. The actual implementation will be created
-when the database foundation is set up.
+Provides async SQLAlchemy engine, session factory, and init/close helpers
+for the Game Account Marketplace.
 """
 
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
 
 from app.core.config import settings
 
@@ -17,9 +16,6 @@ engine = create_async_engine(settings.DATABASE_URL, echo=settings.DATABASE_ECHO,
 
 # Create async session maker
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-# Base class for models
-Base = declarative_base()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -37,9 +33,15 @@ async def init_db() -> None:
     """
     Initialize database tables.
 
-    This will create all tables based on the models.
+    Imports all models so they register on the shared Base.metadata,
+    then creates all tables if they don't exist.
     """
     try:
+        # Import all models to register their metadata on Base
+        import app.models  # noqa: F401
+
+        from app.models.base import Base
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[OK] Database initialized successfully")
